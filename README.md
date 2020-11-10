@@ -5,5 +5,3 @@ I've uploaded three HTML documents and a Jupyter notebook that are representativ
 2. OA4106 Project - Wren.html - R project conducting time series regression to predict social unrest using open source information.
 3. OA3802 Lab 2 - Wren.html - Python assignment utilizing web scraping and fuzzy merge operations to determine particular statistics.a
 4. OA3802 Lab 3 - Wren.html - Python assignment utilizing Twitter scraping and natural language processing to identify sentiment following the final presidential debate.
-
-I'm also including raw data and markdowns for additional exploration.
