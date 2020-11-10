@@ -6,4 +6,4 @@ I've uploaded four HTML documents that are representative of the coding/problems
 3. OA3802 Lab 2 - Wren.html - Python assignment utilizing web scraping and fuzzy merge operations to determine particular statistics.a
 4. OA3802 Lab 3 - Wren.html - Python assignment utilizing Twitter scraping and natural language processing to identify sentiment following the final presidential debate.
 
-For a deeper dive, I'm including the various folders with data and markdowns.
+For a deeper dive, I'm including some folders with data and markdowns but others were not possible due to file size limitations.
