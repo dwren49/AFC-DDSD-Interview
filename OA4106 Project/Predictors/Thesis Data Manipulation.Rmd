@@ -1,0 +1,2060 @@
+---
+title: "Thesis Data Manipulation"
+author: "David Wren"
+date: "6/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE}
+# Clears memory
+# Code sourced from: https://community.rstudio.com/t/how-to-clear-the-r-environment/14303
+rm(list = ls())
+
+setwd("~/")
+setwd("~/Operations Research/Thesis/Predictors")
+library(dplyr)
+library(zoo) # Fill in gaps in economic data
+library(lubridate) # Create weekdays and months from date objects
+```
+
+```{r}
+### Create a date sequence that ranges from 31DEC15 to 31DEC2018 for continuity
+
+# Code sourced from: https://stackoverflow.com/questions/41554915/add-a-date-column-to-a-data-frame
+date_sequence <- as.data.frame(seq(from = as.Date("2015-12-31"), to = as.Date("2019-12-31"), by = 'day'))
+
+# Change column name
+names(date_sequence)[1] <- "event_date"
+```
+
+```{r, warning = FALSE}
+### Read in all of the violent demonstration data
+
+# Determine which columns we will read in
+event_cols <- c('event_date', 'event_type', 'sub_event_type', 'location', 'latitude', 'longitude', 'fatalities')
+
+# Read in accurate count of protest data
+event_data <- read.csv('2016-01-01-2019-12-31-Bahrain.csv', header=TRUE, stringsAsFactors=TRUE)
+
+# Filter out columns we don't want
+event_data <- subset(event_data, select=event_cols) 
+
+# check for NA values and remove as necessary
+any(is.na(event_data))
+
+# Converts dates into exact equal formats for future merging
+event_data$event_date <- as.Date(event_data$event_date, format='%d-%b-%y')
+
+# Aggregate protests by event type over each day
+by_date_type <- event_data %>% group_by(event_date, event_type, sub_event_type, fatalities) %>% summarise(count=n())
+
+# Creates an empty data frame for storage that contains all data
+response_df <- data.frame()
+
+# Join data sets
+response_df <- right_join(by_date_type, date_sequence, by = 'event_date')
+
+# Fill "NA" values with 0
+response_df$count[is.na(response_df$count)] <- 0
+```
+
+Economic data from investing.com
+
+```{r}
+# Determine which columns we will read in
+economic_cols <- c('event_date', 'Price', 'Open',	'High',	'Low')
+```
+
+```{r}
+# Create a dataframe for storage with event_date based upon date_sequence
+bahrain_data <- data.frame(event_date = date_sequence)
+```
+
+```{r}
+### Bahrain All Shares Index (BAX) data
+# Data sourced from: https://www.investing.com/indices/bax
+
+# Read in BAX data
+BAX_data <- read.csv('Bahrain All Share Historical Data.csv', header=TRUE)
+
+# Change column name
+names(BAX_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+BAX_data <- subset(BAX_data, select=economic_cols) 
+
+# Change column names
+names(BAX_data)[2] <- "BAX_Close"
+names(BAX_data)[3] <- "BAX_Open"
+names(BAX_data)[4] <- "BAX_High"
+names(BAX_data)[5] <- "BAX_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+BAX_data$BAX_Close <- as.numeric(gsub("\\,", "", BAX_data$BAX_Close))
+BAX_data$BAX_Open <- as.numeric(gsub("\\,", "", BAX_data$BAX_Open))
+BAX_data$BAX_High <- as.numeric(gsub("\\,", "", BAX_data$BAX_High))
+BAX_data$BAX_Low <- as.numeric(gsub("\\,", "", BAX_data$BAX_Low))
+
+# Converts dates into exact equal formats for future merging
+BAX_data$event_date <- as.Date(BAX_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(BAX_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Bahrain to Euro Currency exchange rate
+# Data sourced from: 
+
+# Read in BAX data
+BHD_EUR <- read.csv('BHD_EUR Historical Data.csv', header=TRUE)
+
+# Change column name
+names(BHD_EUR)[1] <- "event_date"
+
+# Filter out columns we don't want
+BHD_EUR <- subset(BHD_EUR, select=economic_cols) 
+
+# Change column names
+names(BHD_EUR)[2] <- "BHD_EUR_Close"
+names(BHD_EUR)[3] <- "BHD_EUR_Open"
+names(BHD_EUR)[4] <- "BHD_EUR_High"
+names(BHD_EUR)[5] <- "BHD_EUR_Low"
+
+# Converts dates into exact equal formats for future merging
+BHD_EUR$event_date <- as.Date(BHD_EUR$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(BHD_EUR, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Bitcoin data
+# Data sourced from: https://www.investing.com/crypto/bitcoin/btc-usd-historical-data
+
+# Read in Bitcoin data
+Bitcoin_data <- read.csv('BTC_USD Bitfinex Historical Data.csv', header=TRUE)
+
+# Change column name
+names(Bitcoin_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+Bitcoin_data <- subset(Bitcoin_data, select=economic_cols) 
+
+# Change column names
+names(Bitcoin_data)[2] <- "Bitcoin_Close"
+names(Bitcoin_data)[3] <- "Bitcoin_Open"
+names(Bitcoin_data)[4] <- "Bitcoin_High"
+names(Bitcoin_data)[5] <- "Bitcoin_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+Bitcoin_data$Bitcoin_Close <- as.numeric(gsub("\\,", "", Bitcoin_data$Bitcoin_Close))
+Bitcoin_data$Bitcoin_Open <- as.numeric(gsub("\\,", "", Bitcoin_data$Bitcoin_Open))
+Bitcoin_data$Bitcoin_High <- as.numeric(gsub("\\,", "", Bitcoin_data$Bitcoin_High))
+Bitcoin_data$Bitcoin_Low <- as.numeric(gsub("\\,", "", Bitcoin_data$Bitcoin_Low))
+
+# Converts dates into exact equal formats for future merging
+Bitcoin_data$event_date <- as.Date(Bitcoin_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(Bitcoin_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Brent Crude Oil data
+# Data sourced from: https://www.investing.com/commodities/brent-oil
+
+# Read in Brent data
+Brent_data <- read.csv('Brent Oil Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(Brent_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+Brent_data <- subset(Brent_data, select=economic_cols) 
+
+# Change column names
+names(Brent_data)[2] <- "Brent_Close"
+names(Brent_data)[3] <- "Brent_Open"
+names(Brent_data)[4] <- "Brent_High"
+names(Brent_data)[5] <- "Brent_Low"
+
+# Converts dates into exact equal formats for future merging
+Brent_data$event_date <- as.Date(Brent_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(Brent_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Feeder cattle data
+# Data sourced from: https://www.investing.com/commodities/feed-cattle-historical-data
+
+# Read in cattle data
+feed_cattle_data <- read.csv('Feeder Cattle Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(feed_cattle_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+feed_cattle_data <- subset(feed_cattle_data, select=economic_cols) 
+
+# Change column names
+names(feed_cattle_data)[2] <- "feed_cattle_Close"
+names(feed_cattle_data)[3] <- "feed_cattle_Open"
+names(feed_cattle_data)[4] <- "feed_cattle_High"
+names(feed_cattle_data)[5] <- "feed_cattle_Low"
+
+# Converts dates into exact equal formats for future merging
+feed_cattle_data$event_date <- as.Date(feed_cattle_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(feed_cattle_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Live cattle data
+# Data sourced from: https://www.investing.com/commodities/live-cattle-historical-data
+
+# Read in cattle data
+live_cattle_data <- read.csv('Live Cattle Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(live_cattle_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+live_cattle_data <- subset(live_cattle_data, select=economic_cols) 
+
+# Change column names
+names(live_cattle_data)[2] <- "live_cattle_Close"
+names(live_cattle_data)[3] <- "live_cattle_Open"
+names(live_cattle_data)[4] <- "live_cattle_High"
+names(live_cattle_data)[5] <- "live_cattle_Low"
+
+# Converts dates into exact equal formats for future merging
+live_cattle_data$event_date <- as.Date(live_cattle_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(live_cattle_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Coffee data
+# Data sourced from: https://www.investing.com/commodities/us-coffee-c-historical-data
+
+# Read in coffee data
+coffee_data <- read.csv('US Coffee C Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(coffee_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+coffee_data <- subset(coffee_data, select=economic_cols) 
+
+# Change column names
+names(coffee_data)[2] <- "coffee_Close"
+names(coffee_data)[3] <- "coffee_Open"
+names(coffee_data)[4] <- "coffee_High"
+names(coffee_data)[5] <- "coffee_Low"
+
+# Converts dates into exact equal formats for future merging
+coffee_data$event_date <- as.Date(coffee_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(coffee_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Copper data
+# Data sourced from: https://www.investing.com/commodities/copper-historical-data
+
+# Read in copper data
+copper_data <- read.csv('Copper Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(copper_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+copper_data <- subset(copper_data, select=economic_cols) 
+
+# Change column names
+names(copper_data)[2] <- "copper_Close"
+names(copper_data)[3] <- "copper_Open"
+names(copper_data)[4] <- "copper_High"
+names(copper_data)[5] <- "copper_Low"
+
+# Converts dates into exact equal formats for future merging
+copper_data$event_date <- as.Date(copper_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(copper_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Corn data
+# Data sourced from: https://www.investing.com/commodities/us-corn-historical-data
+
+# Read in corn data
+corn_data <- read.csv('US Corn Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(corn_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+corn_data <- subset(corn_data, select=economic_cols) 
+
+# Change column names
+names(corn_data)[2] <- "corn_Close"
+names(corn_data)[3] <- "corn_Open"
+names(corn_data)[4] <- "corn_High"
+names(corn_data)[5] <- "corn_Low"
+
+# Converts dates into exact equal formats for future merging
+corn_data$event_date <- as.Date(corn_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(corn_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Cotton data
+# Data sourced from: https://www.investing.com/commodities/us-cotton-no.2
+
+# Read in cotton data
+cotton_data <- read.csv('US Cotton #2 Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(cotton_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+cotton_data <- subset(cotton_data, select=economic_cols) 
+
+# Change column names
+names(cotton_data)[2] <- "cotton_Close"
+names(cotton_data)[3] <- "cotton_Open"
+names(cotton_data)[4] <- "cotton_High"
+names(cotton_data)[5] <- "cotton_Low"
+
+# Converts dates into exact equal formats for future merging
+cotton_data$event_date <- as.Date(cotton_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(cotton_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### British Pound to Bahraini Dinar Currency exchange rate
+# Data sourced from: 
+
+# Read in BAX data
+GBP_BHD <- read.csv('GBP_BHD Historical Data.csv', header=TRUE)
+
+# Change column name
+names(GBP_BHD)[1] <- "event_date"
+
+# Filter out columns we don't want
+GBP_BHD <- subset(GBP_BHD, select=economic_cols) 
+
+# Change column names
+names(GBP_BHD)[2] <- "GBP_BHD_Close"
+names(GBP_BHD)[3] <- "GBP_BHD_Open"
+names(GBP_BHD)[4] <- "GBP_BHD_High"
+names(GBP_BHD)[5] <- "GBP_BHD_Low"
+
+# Converts dates into exact equal formats for future merging
+GBP_BHD$event_date <- as.Date(GBP_BHD$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(GBP_BHD, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Gold data
+# Data sourced from: https://www.investing.com/commodities/gold-historical-data
+
+# Read in gold data
+gold_data <- read.csv('Gold Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(gold_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+gold_data <- subset(gold_data, select=economic_cols) 
+
+# Change column names
+names(gold_data)[2] <- "Gold_Close"
+names(gold_data)[3] <- "Gold_Open"
+names(gold_data)[4] <- "Gold_High"
+names(gold_data)[5] <- "Gold_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+gold_data$Gold_Close <- as.numeric(gsub("\\,", "", gold_data$Gold_Close))
+gold_data$Gold_Open <- as.numeric(gsub("\\,", "", gold_data$Gold_Open))
+gold_data$Gold_High <- as.numeric(gsub("\\,", "", gold_data$Gold_High))
+gold_data$Gold_Low <- as.numeric(gsub("\\,", "", gold_data$Gold_Low))
+
+# Converts dates into exact equal formats for future merging
+gold_data$event_date <- as.Date(gold_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(gold_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Iron data
+# Data sourced from: https://www.investing.com/indices/dj-iron---steel-historical-data
+
+# Read in iron data
+Iron_USA_data <- read.csv('Dow Jones Iron & Steel Historical Data.csv', header=TRUE)
+
+# Change column name
+names(Iron_USA_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+Iron_USA_data <- subset(Iron_USA_data, select=economic_cols) 
+
+# Change column names
+names(Iron_USA_data)[2] <- "Iron_USA_Close"
+names(Iron_USA_data)[3] <- "Iron_USA_Open"
+names(Iron_USA_data)[4] <- "Iron_USA_High"
+names(Iron_USA_data)[5] <- "Iron_USA_Low"
+
+# Converts dates into exact equal formats for future merging
+Iron_USA_data$event_date <- as.Date(Iron_USA_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(Iron_USA_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Lead data
+# Data sourced from: 
+
+# Read in BAX data
+lead_data <- read.csv('Lead Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(lead_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+lead_data <- subset(lead_data, select=economic_cols) 
+
+# Change column names
+names(lead_data)[2] <- "lead_Close"
+names(lead_data)[3] <- "lead_Open"
+names(lead_data)[4] <- "lead_High"
+names(lead_data)[5] <- "lead_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+lead_data$lead_Close <- as.numeric(gsub("\\,", "", lead_data$lead_Close))
+lead_data$lead_Open <- as.numeric(gsub("\\,", "", lead_data$lead_Open))
+lead_data$lead_High <- as.numeric(gsub("\\,", "", lead_data$lead_High))
+lead_data$lead_Low <- as.numeric(gsub("\\,", "", lead_data$lead_Low))
+
+# Converts dates into exact equal formats for future merging
+lead_data$event_date <- as.Date(lead_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(lead_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Litecoin cryptocurrency data
+# Data sourced from: https://www.investing.com/crypto/litecoin/ltc-eur-historical-data
+
+# Read in iron data
+litecoin_data <- read.csv('LTC_EUR Kraken Historical Data.csv', header=TRUE)
+
+# Change column name
+names(litecoin_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+litecoin_data <- subset(litecoin_data, select=economic_cols) 
+
+# Change column names
+names(litecoin_data)[2] <- "litecoin_Close"
+names(litecoin_data)[3] <- "litecoin_Open"
+names(litecoin_data)[4] <- "litecoin_High"
+names(litecoin_data)[5] <- "litecoin_Low"
+
+# Converts dates into exact equal formats for future merging
+litecoin_data$event_date <- as.Date(litecoin_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(litecoin_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Monero cryptocurrency data
+# Data sourced from: https://www.investing.com/crypto/monero/xmr-usd-historical-data
+
+# Read in iron data
+monero_data <- read.csv('XMR_USD Poloniex Historical Data.csv', header=TRUE)
+
+# Change column name
+names(monero_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+monero_data <- subset(monero_data, select=economic_cols) 
+
+# Change column names
+names(monero_data)[2] <- "monero_Close"
+names(monero_data)[3] <- "monero_Open"
+names(monero_data)[4] <- "monero_High"
+names(monero_data)[5] <- "monero_Low"
+
+# Converts dates into exact equal formats for future merging
+monero_data$event_date <- as.Date(monero_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(monero_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Natural gas data
+# Data sourced from: https://www.investing.com/commodities/natural-gas-historical-data
+
+# Read in natural gas data
+natural_gas_data <- read.csv('Natural Gas Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(natural_gas_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+natural_gas_data <- subset(natural_gas_data, select=economic_cols) 
+
+# Change column names
+names(natural_gas_data)[2] <- "natural_gas_Close"
+names(natural_gas_data)[3] <- "natural_gas_Open"
+names(natural_gas_data)[4] <- "natural_gas_High"
+names(natural_gas_data)[5] <- "natural_gas_Low"
+
+# Converts dates into exact equal formats for future merging
+natural_gas_data$event_date <- as.Date(natural_gas_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(natural_gas_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Nickel data
+# Data sourced from: 
+
+# Read in BAX data
+nickel_data <- read.csv('Nickel Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(nickel_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+nickel_data <- subset(nickel_data, select=economic_cols) 
+
+# Change column names
+names(nickel_data)[2] <- "nickel_Close"
+names(nickel_data)[3] <- "nickel_Open"
+names(nickel_data)[4] <- "nickel_High"
+names(nickel_data)[5] <- "nickel_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+nickel_data$nickel_Close <- as.numeric(gsub("\\,", "", nickel_data$nickel_Close))
+nickel_data$nickel_Open <- as.numeric(gsub("\\,", "", nickel_data$nickel_Open))
+nickel_data$nickel_High <- as.numeric(gsub("\\,", "", nickel_data$nickel_High))
+nickel_data$nickel_Low <- as.numeric(gsub("\\,", "", nickel_data$nickel_Low))
+
+# Converts dates into exact equal formats for future merging
+nickel_data$event_date <- as.Date(nickel_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(nickel_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Platinum data
+# Data sourced from: https://www.investing.com/commodities/platinum-historical-data
+
+# Read in platinum data
+platinum_data <- read.csv('Platinum Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(platinum_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+platinum_data <- subset(platinum_data, select=economic_cols) 
+
+# Change column names
+names(platinum_data)[2] <- "platinum_Close"
+names(platinum_data)[3] <- "platinum_Open"
+names(platinum_data)[4] <- "platinum_High"
+names(platinum_data)[5] <- "platinum_Low"
+
+# Converts dates into exact equal formats for future merging
+platinum_data$event_date <- as.Date(platinum_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(platinum_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Rice data
+# Data sourced from: https://www.investing.com/commodities/rough-rice-historical-data
+
+# Read in rice data
+rice_data <- read.csv('Rough Rice Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(rice_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+rice_data <- subset(rice_data, select=economic_cols) 
+
+# Change column names
+names(rice_data)[2] <- "rice_Close"
+names(rice_data)[3] <- "rice_Open"
+names(rice_data)[4] <- "rice_High"
+names(rice_data)[5] <- "rice_Low"
+
+# Converts dates into exact equal formats for future merging
+rice_data$event_date <- as.Date(rice_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(rice_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Silver data
+# Data sourced from: https://www.investing.com/commodities/silver-historical-data
+
+# Read in silver data
+silver_data <- read.csv('Silver Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(silver_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+silver_data <- subset(silver_data, select=economic_cols) 
+
+# Change column names
+names(silver_data)[2] <- "silver_Close"
+names(silver_data)[3] <- "silver_Open"
+names(silver_data)[4] <- "silver_High"
+names(silver_data)[5] <- "silver_Low"
+
+# Converts dates into exact equal formats for future merging
+silver_data$event_date <- as.Date(silver_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(silver_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Soybean data
+# Data sourced from: https://www.investing.com/commodities/us-soybeans-historical-data
+
+# Read in soybean data
+soybean_data <- read.csv('US Soybeans Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(soybean_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+soybean_data <- subset(soybean_data, select=economic_cols) 
+
+# Change column names
+names(soybean_data)[2] <- "soybean_Close"
+names(soybean_data)[3] <- "soybean_Open"
+names(soybean_data)[4] <- "soybean_High"
+names(soybean_data)[5] <- "soybean_Low"
+
+# Converts dates into exact equal formats for future merging
+soybean_data$event_date <- as.Date(soybean_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(soybean_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Sugar data
+# Data sourced from: https://www.investing.com/commodities/us-sugar-no11-historical-data
+
+# Read in sugar data
+sugar_data <- read.csv('US Sugar #11 Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(sugar_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+sugar_data <- subset(sugar_data, select=economic_cols) 
+
+# Change column names
+names(sugar_data)[2] <- "sugar_Close"
+names(sugar_data)[3] <- "sugar_Open"
+names(sugar_data)[4] <- "sugar_High"
+names(sugar_data)[5] <- "sugar_Low"
+
+# Converts dates into exact equal formats for future merging
+sugar_data$event_date <- as.Date(sugar_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(sugar_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Tin data
+# Data sourced from: 
+
+# Read in BAX data
+tin_data <- read.csv('Tin Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(tin_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+tin_data <- subset(tin_data, select=economic_cols) 
+
+# Change column names
+names(tin_data)[2] <- "tin_Close"
+names(tin_data)[3] <- "tin_Open"
+names(tin_data)[4] <- "tin_High"
+names(tin_data)[5] <- "tin_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+tin_data$tin_Close <- as.numeric(gsub("\\,", "", tin_data$tin_Close))
+tin_data$tin_Open <- as.numeric(gsub("\\,", "", tin_data$tin_Open))
+tin_data$tin_High <- as.numeric(gsub("\\,", "", tin_data$tin_High))
+tin_data$tin_Low <- as.numeric(gsub("\\,", "", tin_data$tin_Low))
+
+# Converts dates into exact equal formats for future merging
+tin_data$event_date <- as.Date(tin_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(tin_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### US Dollar to Bahraini Dinar Currency exchange rate
+# Data sourced from: 
+
+# Read in BAX data
+USD_BHD <- read.csv('USD_BHD Historical Data.csv', header=TRUE)
+
+# Change column name
+names(USD_BHD)[1] <- "event_date"
+
+# Filter out columns we don't want
+USD_BHD <- subset(USD_BHD, select=economic_cols) 
+
+# Change column names
+names(USD_BHD)[2] <- "USD_BHD_Close"
+names(USD_BHD)[3] <- "USD_BHD_Open"
+names(USD_BHD)[4] <- "USD_BHD_High"
+names(USD_BHD)[5] <- "USD_BHD_Low"
+
+# Converts dates into exact equal formats for future merging
+USD_BHD$event_date <- as.Date(USD_BHD$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(USD_BHD, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Wheat data
+# Data sourced from: https://www.investing.com/commodities/us-wheat-historical-data
+
+# Read in wheat data
+wheat_data <- read.csv('US Wheat Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(wheat_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+wheat_data <- subset(wheat_data, select=economic_cols) 
+
+# Change column names
+names(wheat_data)[2] <- "wheat_Close"
+names(wheat_data)[3] <- "wheat_Open"
+names(wheat_data)[4] <- "wheat_High"
+names(wheat_data)[5] <- "wheat_Low"
+
+# Converts dates into exact equal formats for future merging
+wheat_data$event_date <- as.Date(wheat_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(wheat_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### West Texas International (WTI) Crude Oil data
+# Data sourced from: https://www.investing.com/commodities/crude-oil-historical-data
+
+# Read in WTI data
+WTI_data <- read.csv('Crude Oil WTI Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(WTI_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+WTI_data <- subset(WTI_data, select=economic_cols) 
+
+# Change column names
+names(WTI_data)[2] <- "WTI_Close"
+names(WTI_data)[3] <- "WTI_Open"
+names(WTI_data)[4] <- "WTI_High"
+names(WTI_data)[5] <- "WTI_Low"
+
+# Converts dates into exact equal formats for future merging
+WTI_data$event_date <- as.Date(WTI_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(WTI_data, bahrain_data, by = 'event_date')
+```
+
+```{r}
+### Zinc data
+# Data sourced from: 
+
+# Read in BAX data
+zinc_data <- read.csv('Zinc Futures Historical Data.csv', header=TRUE)
+
+# Change column name
+names(zinc_data)[1] <- "event_date"
+
+# Filter out columns we don't want
+zinc_data <- subset(zinc_data, select=economic_cols) 
+
+# Change column names
+names(zinc_data)[2] <- "zinc_Close"
+names(zinc_data)[3] <- "zinc_Open"
+names(zinc_data)[4] <- "zinc_High"
+names(zinc_data)[5] <- "zinc_Low"
+
+# Remove commas from entries
+# Code sourced from: https://www.rforexcelusers.com/remove-currency-dollar-sign-r/
+zinc_data$zinc_Close <- as.numeric(gsub("\\,", "", zinc_data$zinc_Close))
+zinc_data$zinc_Open <- as.numeric(gsub("\\,", "", zinc_data$zinc_Open))
+zinc_data$zinc_High <- as.numeric(gsub("\\,", "", zinc_data$zinc_High))
+zinc_data$zinc_Low <- as.numeric(gsub("\\,", "", zinc_data$zinc_Low))
+
+# Converts dates into exact equal formats for future merging
+zinc_data$event_date <- as.Date(zinc_data$event_date, format='%b %d, %Y')
+
+# Join data sets
+bahrain_data <- right_join(zinc_data, bahrain_data, by = 'event_date')
+```
+
+Fill in economic data
+
+```{r}
+# Code sourced from: https://statisticsglobe.com/replace-na-with-last-observed-value-in-r
+bahrain_data <- na.locf(bahrain_data)
+
+# Delete first row (31DEC15) from dataframe
+bahrain_data <- bahrain_data[-1,]
+```
+
+```{r}
+# Code sourced from: https://stackoverflow.com/questions/41554915/add-a-date-column-to-a-data-frame
+date_sequence <- as.data.frame(seq(from = as.Date("2016-01-01"), to = as.Date("2019-12-31"), by = 'day'))
+
+# Change column name
+names(date_sequence)[1] <- "event_date"
+```
+
+Social media data
+
+```{r}
+# Read in the data associated with Al Jazeera's Arabic Twitter Handle
+AJArabic <- read.csv("AJArabic_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(AJArabic)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+AJArabic$event_date <- as.Date(AJArabic$event_date, format='%Y-%m-%d')
+
+# Join data sets
+AJArabic <- right_join(AJArabic, date_sequence, by = 'event_date')
+
+# Change column name
+names(AJArabic)[3] <- "AJArabic_Total_Posts"
+names(AJArabic)[4] <- "AJArabic_Favorites"
+names(AJArabic)[5] <- "AJArabic_Retweets"
+
+# Remove the 'Handle' column
+AJArabic$Handle <- NULL
+
+# Fill "NA" values with 0
+AJArabic$AJArabic_Total_Posts[is.na(AJArabic$AJArabic_Total_Posts)] <- 0
+AJArabic$AJArabic_Favorites[is.na(AJArabic$AJArabic_Favorites)] <- 0
+AJArabic$AJArabic_Retweets[is.na(AJArabic$AJArabic_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with al Wafa's Twitter handle
+al_wafa <- read.csv("Alwafa_Party_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(al_wafa)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+al_wafa$event_date <- as.Date(al_wafa$event_date, format='%m/%d/%Y')
+
+# Join data sets
+al_wafa <- right_join(al_wafa, date_sequence, by = 'event_date')
+
+# Change column name
+names(al_wafa)[3] <- "al_wafa_Total_Posts"
+names(al_wafa)[4] <- "al_wafa_Favorites"
+names(al_wafa)[5] <- "al_wafa_Retweets"
+
+# Remove the 'Handle' column
+al_wafa$Handle <- NULL
+
+# Fill "NA" values with 0
+al_wafa$al_wafa_Total_Posts[is.na(al_wafa$al_wafa_Total_Posts)] <- 0
+al_wafa$al_wafa_Favorites[is.na(al_wafa$al_wafa_Favorites)] <- 0
+al_wafa$al_wafa_Retweets[is.na(al_wafa$al_wafa_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+Alwatan_Live <- read.csv("Alwatan_Live_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(Alwatan_Live)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+Alwatan_Live$event_date <- as.Date(Alwatan_Live$event_date, format='%m/%d/%Y')
+
+# Join data sets
+Alwatan_Live <- right_join(Alwatan_Live, date_sequence, by = 'event_date')
+
+# Change column name
+names(Alwatan_Live)[3] <- "Alwatan_Live_Total_Posts"
+names(Alwatan_Live)[4] <- "Alwatan_Live_Favorites"
+names(Alwatan_Live)[5] <- "Alwatan_Live_Retweets"
+
+# Remove the 'Handle' column
+Alwatan_Live$Handle <- NULL
+
+# Fill "NA" values with 0
+Alwatan_Live$Alwatan_Live_Total_Posts[is.na(Alwatan_Live$Alwatan_Live_Total_Posts)] <- 0
+Alwatan_Live$Alwatan_Live_Favorites[is.na(Alwatan_Live$Alwatan_Live_Favorites)] <- 0
+Alwatan_Live$Alwatan_Live_Retweets[is.na(Alwatan_Live$Alwatan_Live_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Bahrain MoI
+bahrain_moi <- read.csv("bahrain_moi_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(bahrain_moi)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+bahrain_moi$event_date <- as.Date(bahrain_moi$event_date, format='%m/%d/%Y')
+
+# Join data sets
+bahrain_moi <- right_join(bahrain_moi, date_sequence, by = 'event_date')
+
+# Change column name
+names(bahrain_moi)[3] <- "bahrain_moi_Total_Posts"
+names(bahrain_moi)[4] <- "bahrain_moi_Favorites"
+names(bahrain_moi)[5] <- "bahrain_moi_Retweets"
+
+# Remove the 'Handle' column
+bahrain_moi$Handle <- NULL
+
+# Fill "NA" values with 0
+bahrain_moi$bahrain_moi_Total_Posts[is.na(bahrain_moi$bahrain_moi_Total_Posts)] <- 0
+bahrain_moi$bahrain_moi_Favorites[is.na(bahrain_moi$bahrain_moi_Favorites)] <- 0
+bahrain_moi$bahrain_moi_Retweets[is.na(bahrain_moi$bahrain_moi_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with the BahrainRights dissident group
+BahrainRights <- read.csv("BahrainRights_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(BahrainRights)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+BahrainRights$event_date <- as.Date(BahrainRights$event_date, format='%m/%d/%Y')
+
+# Join data sets
+BahrainRights <- right_join(BahrainRights, date_sequence, by = 'event_date')
+
+# Change column name
+names(BahrainRights)[3] <- "BahrainRights_Total_Posts"
+names(BahrainRights)[4] <- "BahrainRights_Favorites"
+names(BahrainRights)[5] <- "BahrainRights_Retweets"
+
+# Remove the 'Handle' column
+BahrainRights$Handle <- NULL
+
+# Fill "NA" values with 0
+BahrainRights$BahrainRights_Total_Posts[is.na(BahrainRights$BahrainRights_Total_Posts)] <- 0
+BahrainRights$BahrainRights_Favorites[is.na(BahrainRights$BahrainRights_Favorites)] <- 0
+BahrainRights$BahrainRights_Retweets[is.na(BahrainRights$BahrainRights_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Bahrain MoI
+bahrain_moi <- read.csv("bahrain_moi_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(bahrain_moi)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+bahrain_moi$event_date <- as.Date(bahrain_moi$event_date, format='%m/%d/%Y')
+
+# Join data sets
+bahrain_moi <- right_join(bahrain_moi, date_sequence, by = 'event_date')
+
+# Change column name
+names(bahrain_moi)[3] <- "bahrain_moi_Total_Posts"
+names(bahrain_moi)[4] <- "bahrain_moi_Favorites"
+names(bahrain_moi)[5] <- "bahrain_moi_Retweets"
+
+# Remove the 'Handle' column
+bahrain_moi$Handle <- NULL
+
+# Fill "NA" values with 0
+bahrain_moi$bahrain_moi_Total_Posts[is.na(bahrain_moi$bahrain_moi_Total_Posts)] <- 0
+bahrain_moi$bahrain_moi_Favorites[is.na(bahrain_moi$bahrain_moi_Favorites)] <- 0
+bahrain_moi$bahrain_moi_Retweets[is.na(bahrain_moi$bahrain_moi_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with BBC Arabic's Twitter handle
+BBCArabic <- read.csv("BBCArabic_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(BBCArabic)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+BBCArabic$event_date <- as.Date(BBCArabic$event_date, format='%Y-%m-%d')
+
+# Join data sets
+BBCArabic <- right_join(BBCArabic, date_sequence, by = 'event_date')
+
+# Change column name
+names(BBCArabic)[3] <- "BBCArabic_Total_Posts"
+names(BBCArabic)[4] <- "BBCArabic_Favorites"
+names(BBCArabic)[5] <- "BBCArabic_Retweets"
+
+# Remove the 'Handle' column
+BBCArabic$Handle <- NULL
+
+# Fill "NA" values with 0
+BBCArabic$BBCArabic_Total_Posts[is.na(BBCArabic$BBCArabic_Total_Posts)] <- 0
+BBCArabic$BBCArabic_Favorites[is.na(BBCArabic$BBCArabic_Favorites)] <- 0
+BBCArabic$BBCArabic_Retweets[is.na(BBCArabic$BBCArabic_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with the bh14feb2011 Twitter handle
+bh14feb2011 <- read.csv("bh14feb2011_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(bh14feb2011)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+bh14feb2011$event_date <- as.Date(bh14feb2011$event_date, format='%m/%d/%Y')
+
+# Join data sets
+bh14feb2011 <- right_join(bh14feb2011, date_sequence, by = 'event_date')
+
+# Change column name
+names(bh14feb2011)[3] <- "bh14feb2011_Total_Posts"
+names(bh14feb2011)[4] <- "bh14feb2011_Favorites"
+names(bh14feb2011)[5] <- "bh14feb2011_Retweets"
+
+# Remove the 'Handle' column
+bh14feb2011$Handle <- NULL
+
+# Fill "NA" values with 0
+bh14feb2011$bh14feb2011_Total_Posts[is.na(bh14feb2011$bh14feb2011_Total_Posts)] <- 0
+bh14feb2011$bh14feb2011_Favorites[is.na(bh14feb2011$bh14feb2011_Favorites)] <- 0
+bh14feb2011$bh14feb2011_Retweets[is.na(bh14feb2011$bh14feb2011_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Bahrain's newspaper Twitter Handle
+bna_ar <- read.csv("bna_ar_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(bna_ar)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+bna_ar$event_date <- as.Date(bna_ar$event_date, format='%m/%d/%Y')
+
+# Join data sets
+bna_ar <- right_join(bna_ar, date_sequence, by = 'event_date')
+
+# Change column name
+names(bna_ar)[3] <- "bna_ar_Total_Posts"
+names(bna_ar)[4] <- "bna_ar_Favorites"
+names(bna_ar)[5] <- "bna_ar_Retweets"
+
+# Remove the 'Handle' column
+bna_ar$Handle <- NULL
+
+# Fill "NA" values with 0
+bna_ar$bna_ar_Total_Posts[is.na(bna_ar$bna_ar_Total_Posts)] <- 0
+bna_ar$bna_ar_Favorites[is.na(bna_ar$bna_ar_Favorites)] <- 0
+bna_ar$bna_ar_Retweets[is.na(bna_ar$bna_ar_Retweets)] <- 0
+```
+
+```{r}
+
+# Read in the data associated with coalition14
+coalition14 <- read.csv("coalition14_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(coalition14)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+coalition14$event_date <- as.Date(coalition14$event_date, format='%m/%d/%Y')
+
+# Join data sets
+coalition14 <- right_join(coalition14, date_sequence, by = 'event_date')
+
+# Change column name
+names(coalition14)[3] <- "Coalition14_Total_Posts"
+names(coalition14)[4] <- "Coalition14_Favorites"
+names(coalition14)[5] <- "Coalition14_Retweets"
+
+# Remove the 'Handle' column
+coalition14$Handle <- NULL
+
+# Fill "NA" values with 0
+coalition14$Coalition14_Total_Posts[is.na(coalition14$Coalition14_Total_Posts)] <- 0
+coalition14$Coalition14_Favorites[is.na(coalition14$Coalition14_Favorites)] <- 0
+coalition14$Coalition14_Retweets[is.na(coalition14$Coalition14_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with the DurazYouth Twitter handle
+duraz_youth <- read.csv("duraz_youth_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(duraz_youth)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+duraz_youth$event_date <- as.Date(duraz_youth$event_date, format='%m/%d/%Y')
+
+# Join data sets
+duraz_youth <- right_join(duraz_youth, date_sequence, by = 'event_date')
+
+# Change column name
+names(duraz_youth)[3] <- "duraz_youth_Total_Posts"
+names(duraz_youth)[4] <- "duraz_youth_Favorites"
+names(duraz_youth)[5] <- "duraz_youth_Retweets"
+
+# Remove the 'Handle' column
+duraz_youth$Handle <- NULL
+
+# Fill "NA" values with 0
+duraz_youth$duraz_youth_Total_Posts[is.na(duraz_youth$duraz_youth_Total_Posts)] <- 0
+duraz_youth$duraz_youth_Favorites[is.na(duraz_youth$duraz_youth_Favorites)] <- 0
+duraz_youth$duraz_youth_Retweets[is.na(duraz_youth$duraz_youth_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+feb14revolution <- read.csv("14FebRevolution_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(feb14revolution)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+feb14revolution$event_date <- as.Date(feb14revolution$event_date, format='%m/%d/%Y')
+
+# Join data sets
+feb14revolution <- right_join(feb14revolution, date_sequence, by = 'event_date')
+
+# Change column name
+names(feb14revolution)[3] <- "feb14revolution_Total_Posts"
+names(feb14revolution)[4] <- "feb14revolution_Favorites"
+names(feb14revolution)[5] <- "feb14revolution_Retweets"
+
+# Remove the 'Handle' column
+feb14revolution$Handle <- NULL
+
+# Fill "NA" values with 0
+feb14revolution$feb14revolution_Total_Posts[is.na(feb14revolution$feb14revolution_Total_Posts)] <- 0
+feb14revolution$feb14revolution_Favorites[is.na(feb14revolution$feb14revolution_Favorites)] <- 0
+feb14revolution$feb14revolution_Retweets[is.na(feb14revolution$feb14revolution_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with GDNonline's official Twitter Handle
+GDNonline <- read.csv("GDNonline_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(GDNonline)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+GDNonline$event_date <- as.Date(GDNonline$event_date, format='%Y-%m-%d')
+
+# Join data sets
+GDNonline <- right_join(GDNonline, date_sequence, by = 'event_date')
+
+# Change column name
+names(GDNonline)[3] <- "GDNonline_Total_Posts"
+names(GDNonline)[4] <- "GDNonline_Favorites"
+names(GDNonline)[5] <- "GDNonline_Retweets"
+
+# Remove the 'Handle' column
+GDNonline$Handle <- NULL
+
+# Fill "NA" values with 0
+GDNonline$GDNonline_Total_Posts[is.na(GDNonline$GDNonline_Total_Posts)] <- 0
+GDNonline$GDNonline_Favorites[is.na(GDNonline$GDNonline_Favorites)] <- 0
+GDNonline$GDNonline_Retweets[is.na(GDNonline$GDNonline_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Iran's official Twitter Handle
+Iran <- read.csv("Iran_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(Iran)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+Iran$event_date <- as.Date(Iran$event_date, format='%Y-%m-%d')
+
+# Join data sets
+Iran <- right_join(Iran, date_sequence, by = 'event_date')
+
+# Change column name
+names(Iran)[3] <- "Iran_Total_Posts"
+names(Iran)[4] <- "Iran_Favorites"
+names(Iran)[5] <- "Iran_Retweets"
+
+# Remove the 'Handle' column
+Iran$Handle <- NULL
+
+# Fill "NA" values with 0
+Iran$Iran_Total_Posts[is.na(Iran$Iran_Total_Posts)] <- 0
+Iran$Iran_Favorites[is.na(Iran$Iran_Favorites)] <- 0
+Iran$Iran_Retweets[is.na(Iran$Iran_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Iranian Human Rights Twitter Handle
+IranNW <- read.csv("IranNW_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(IranNW)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+IranNW$event_date <- as.Date(IranNW$event_date, format = '%Y-%m-%d')
+
+# Join data sets
+IranNW <- right_join(IranNW, date_sequence, by = 'event_date')
+
+# Change column name
+names(IranNW)[3] <- "IranNW_Total_Posts"
+names(IranNW)[4] <- "IranNW_Favorites"
+names(IranNW)[5] <- "IranNW_Retweets"
+
+# Remove the 'Handle' column
+IranNW$Handle <- NULL
+
+# Fill "NA" values with 0
+IranNW$IranNW_Total_Posts[is.na(IranNW$IranNW_Total_Posts)] <- 0
+IranNW$IranNW_Favorites[is.na(IranNW$IranNW_Favorites)] <- 0
+IranNW$IranNW_Retweets[is.na(IranNW$IranNW_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+khalidalkhalifa <- read.csv("khalidalkhalifa_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(khalidalkhalifa)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+khalidalkhalifa$event_date <- as.Date(khalidalkhalifa$event_date, format='%m/%d/%Y')
+
+# Join data sets
+khalidalkhalifa <- right_join(khalidalkhalifa, date_sequence, by = 'event_date')
+
+# Change column name
+names(khalidalkhalifa)[3] <- "khalidalkhalifa_Total_Posts"
+names(khalidalkhalifa)[4] <- "khalidalkhalifa_Favorites"
+names(khalidalkhalifa)[5] <- "khalidalkhalifa_Retweets"
+
+# Remove the 'Handle' column
+khalidalkhalifa$Handle <- NULL
+
+# Fill "NA" values with 0
+khalidalkhalifa$khalidalkhalifa_Total_Posts[is.na(khalidalkhalifa$khalidalkhalifa_Total_Posts)] <- 0
+khalidalkhalifa$khalidalkhalifa_Favorites[is.na(khalidalkhalifa$khalidalkhalifa_Favorites)] <- 0
+khalidalkhalifa$khalidalkhalifa_Retweets[is.na(khalidalkhalifa$khalidalkhalifa_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with The Supreme Leader of Iran, Ayatalloah Khamenei's Twitter Handle
+khamenei <- read.csv("khamenei_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(khamenei)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+khamenei$event_date <- as.Date(khamenei$event_date, format='%m/%d/%Y')
+
+# Join data sets
+khamenei <- right_join(khamenei, date_sequence, by = 'event_date')
+
+# Change column name
+names(khamenei)[3] <- "khamenei_Total_Posts"
+names(khamenei)[4] <- "khamenei_Favorites"
+names(khamenei)[5] <- "khamenei_Retweets"
+
+# Remove the 'Handle' column
+khamenei$Handle <- NULL
+
+# Fill "NA" values with 0
+khamenei$khamenei_Total_Posts[is.na(khamenei$khamenei_Total_Posts)] <- 0
+khamenei$khamenei_Favorites[is.na(khamenei$khamenei_Favorites)] <- 0
+khamenei$khamenei_Retweets[is.na(khamenei$khamenei_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+KUhp2222 <- read.csv("KUhp2222_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(KUhp2222)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+KUhp2222$event_date <- as.Date(KUhp2222$event_date, format='%m/%d/%Y')
+
+# Join data sets
+KUhp2222 <- right_join(KUhp2222, date_sequence, by = 'event_date')
+
+# Change column name
+names(KUhp2222)[3] <- "KUhp2222_Total_Posts"
+names(KUhp2222)[4] <- "KUhp2222_Favorites"
+names(KUhp2222)[5] <- "KUhp2222_Retweets"
+
+# Remove the 'Handle' column
+KUhp2222$Handle <- NULL
+
+# Fill "NA" values with 0
+KUhp2222$KUhp2222_Total_Posts[is.na(KUhp2222$KUhp2222_Total_Posts)] <- 0
+KUhp2222$KUhp2222_Favorites[is.na(KUhp2222$KUhp2222_Favorites)] <- 0
+KUhp2222$KUhp2222_Retweets[is.na(KUhp2222$KUhp2222_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+malarab1 <- read.csv("malarab1_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(malarab1)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+malarab1$event_date <- as.Date(malarab1$event_date, format='%m/%d/%Y')
+
+# Join data sets
+malarab1 <- right_join(malarab1, date_sequence, by = 'event_date')
+
+# Change column name
+names(malarab1)[3] <- "malarab1_Total_Posts"
+names(malarab1)[4] <- "malarab1_Favorites"
+names(malarab1)[5] <- "malarab1_Retweets"
+
+# Remove the 'Handle' column
+malarab1$Handle <- NULL
+
+# Fill "NA" values with 0
+malarab1$malarab1_Total_Posts[is.na(malarab1$malarab1_Total_Posts)] <- 0
+malarab1$malarab1_Favorites[is.na(malarab1$malarab1_Favorites)] <- 0
+malarab1$malarab1_Retweets[is.na(malarab1$malarab1_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+NABEELRAJAB <- read.csv("NABEELRAJAB_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(NABEELRAJAB)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+NABEELRAJAB$event_date <- as.Date(NABEELRAJAB$event_date, format='%m/%d/%Y')
+
+# Join data sets
+NABEELRAJAB <- right_join(NABEELRAJAB, date_sequence, by = 'event_date')
+
+# Change column name
+names(NABEELRAJAB)[3] <- "NABEELRAJAB_Total_Posts"
+names(NABEELRAJAB)[4] <- "NABEELRAJAB_Favorites"
+names(NABEELRAJAB)[5] <- "NABEELRAJAB_Retweets"
+
+# Remove the 'Handle' column
+NABEELRAJAB$Handle <- NULL
+
+# Fill "NA" values with 0
+NABEELRAJAB$NABEELRAJAB_Total_Posts[is.na(NABEELRAJAB$NABEELRAJAB_Total_Posts)] <- 0
+NABEELRAJAB$NABEELRAJAB_Favorites[is.na(NABEELRAJAB$NABEELRAJAB_Favorites)] <- 0
+NABEELRAJAB$NABEELRAJAB_Retweets[is.na(NABEELRAJAB$NABEELRAJAB_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Prime Minister Netanyahu's Twitter Handle
+netanyahu <- read.csv("netanyahu_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(netanyahu)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+netanyahu$event_date <- as.Date(netanyahu$event_date, format='%m/%d/%Y')
+
+# Join data sets
+netanyahu <- right_join(netanyahu, date_sequence, by = 'event_date')
+
+# Change column name
+names(netanyahu)[3] <- "netanyahu_Total_Posts"
+names(netanyahu)[4] <- "netanyahu_Favorites"
+names(netanyahu)[5] <- "netanyahu_Retweets"
+
+# Remove the 'Handle' column
+netanyahu$Handle <- NULL
+
+# Fill "NA" values with 0
+netanyahu$netanyahu_Total_Posts[is.na(netanyahu$netanyahu_Total_Posts)] <- 0
+netanyahu$netanyahu_Favorites[is.na(netanyahu$netanyahu_Favorites)] <- 0
+netanyahu$netanyahu_Retweets[is.na(netanyahu$netanyahu_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+NSA_Bahrain <- read.csv("NSA_Bahrain_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(NSA_Bahrain)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+NSA_Bahrain$event_date <- as.Date(NSA_Bahrain$event_date, format='%m/%d/%Y')
+
+# Join data sets
+NSA_Bahrain <- right_join(NSA_Bahrain, date_sequence, by = 'event_date')
+
+# Change column name
+names(NSA_Bahrain)[3] <- "NSA_Bahrain_Total_Posts"
+names(NSA_Bahrain)[4] <- "NSA_Bahrain_Favorites"
+names(NSA_Bahrain)[5] <- "NSA_Bahrain_Retweets"
+
+# Remove the 'Handle' column
+NSA_Bahrain$Handle <- NULL
+
+# Fill "NA" values with 0
+NSA_Bahrain$NSA_Bahrain_Total_Posts[is.na(NSA_Bahrain$NSA_Bahrain_Total_Posts)] <- 0
+NSA_Bahrain$NSA_Bahrain_Favorites[is.na(NSA_Bahrain$NSA_Bahrain_Favorites)] <- 0
+NSA_Bahrain$NSA_Bahrain_Retweets[is.na(NSA_Bahrain$NSA_Bahrain_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with President Rouhani's Twitter Handle
+rouhani <- read.csv("HassanRouhani_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(rouhani)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+rouhani$event_date <- as.Date(rouhani$event_date, format='%m/%d/%Y')
+
+# Join data sets
+rouhani <- right_join(rouhani, date_sequence, by = 'event_date')
+
+# Change column name
+names(rouhani)[3] <- "rouhani_Total_Posts"
+names(rouhani)[4] <- "rouhani_Favorites"
+names(rouhani)[5] <- "rouhani_Retweets"
+
+# Remove the 'Handle' column
+rouhani$Handle <- NULL
+
+# Fill "NA" values with 0
+rouhani$rouhani_Total_Posts[is.na(rouhani$rouhani_Total_Posts)] <- 0
+rouhani$rouhani_Favorites[is.na(rouhani$rouhani_Favorites)] <- 0
+rouhani$rouhani_Retweets[is.na(rouhani$rouhani_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with Donald Trump's Twitter Handle
+trump <- read.csv("realDonaldTrump_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(trump)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+trump$event_date <- as.Date(trump$event_date, format='%m/%d/%Y')
+
+# Join data sets
+trump <- right_join(trump, date_sequence, by = 'event_date')
+
+# Change column name
+names(trump)[3] <- "trump_Total_Posts"
+names(trump)[4] <- "trump_Favorites"
+names(trump)[5] <- "trump_Retweets"
+
+# Remove the 'Handle' column
+trump$Handle <- NULL
+
+# Fill "NA" values with 0
+trump$trump_Total_Posts[is.na(trump$trump_Total_Posts)] <- 0
+trump$trump_Favorites[is.na(trump$trump_Favorites)] <- 0
+trump$trump_Retweets[is.na(trump$trump_Retweets)] <- 0
+```
+
+```{r}
+# Read in the data associated with NSA Bahrain's Twitter handle
+USEmbassyManama <- read.csv("USEmbassyManama_counts.csv", header=TRUE, stringsAsFactors=TRUE)
+
+# Change column name
+names(USEmbassyManama)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+USEmbassyManama$event_date <- as.Date(USEmbassyManama$event_date, format='%m/%d/%Y')
+
+# Join data sets
+USEmbassyManama <- right_join(USEmbassyManama, date_sequence, by = 'event_date')
+
+# Change column name
+names(USEmbassyManama)[3] <- "USEmbassyManama_Total_Posts"
+names(USEmbassyManama)[4] <- "USEmbassyManama_Favorites"
+names(USEmbassyManama)[5] <- "USEmbassyManama_Retweets"
+
+# Remove the 'Handle' column
+USEmbassyManama$Handle <- NULL
+
+# Fill "NA" values with 0
+USEmbassyManama$USEmbassyManama_Total_Posts[is.na(USEmbassyManama$USEmbassyManama_Total_Posts)] <- 0
+USEmbassyManama$USEmbassyManama_Favorites[is.na(USEmbassyManama$USEmbassyManama_Favorites)] <- 0
+USEmbassyManama$USEmbassyManama_Retweets[is.na(USEmbassyManama$USEmbassyManama_Retweets)] <- 0
+```
+
+```{r}
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+social_media_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(AJArabic, al_wafa, Alwatan_Live, bahrain_moi, BahrainRights, BBCArabic, bh14feb2011, bna_ar, coalition14, duraz_youth, feb14revolution, GDNonline, Iran, IranNW, khalidalkhalifa, khamenei, KUhp2222, malarab1, NABEELRAJAB, netanyahu, NSA_Bahrain, rouhani, trump, USEmbassyManama))
+```
+
+Physical environment data:
+from https://www7.ncdc.noaa.gov/CDO/cdoselect.cmd?datasetabbv=GSOD
+
+```{r}
+# Determine which columns we will read in
+weather_cols <- c('DATE', 'TEMP', 'DEWP',	'WDSP', 'MXSPD', 'PRCP')
+```
+
+```{r}
+# Read in weather data
+weather_2016 <- read.csv('weather_2016.csv', header = TRUE)
+
+# Filter out columns we don't want
+weather_2016 <- subset(weather_2016, select=weather_cols) 
+
+# Change column name
+names(weather_2016)[1] <- "event_date"
+```
+
+```{r}
+# Read in weather data
+weather_2017 <- read.csv('weather_2017.csv', header = TRUE)
+
+# Filter out columns we don't want
+weather_2017 <- subset(weather_2017, select=weather_cols) 
+
+# Change column name
+names(weather_2017)[1] <- "event_date"
+```
+
+```{r}
+# Read in weather data
+weather_2018 <- read.csv('weather_2018.csv', header = TRUE)
+
+# Filter out columns we don't want
+weather_2018 <- subset(weather_2018, select=weather_cols) 
+
+# Change column name
+names(weather_2018)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+weather_2018$event_date <- as.Date(weather_2018$event_date, format='%m/%d/%Y')
+```
+
+```{r}
+# Read in weather data
+weather_2019 <- read.csv('weather_2019.csv', header = TRUE)
+
+# Filter out columns we don't want
+weather_2019 <- subset(weather_2019, select=weather_cols) 
+
+# Change column name
+names(weather_2019)[1] <- "event_date"
+
+# Converts dates into exact equal formats for future merging
+weather_2019$event_date <- as.Date(weather_2019$event_date, format='%m/%d/%Y')
+```
+
+```{r}
+# Create an empty dataframe for vertically stacking weather data
+weather_df <- data.frame()
+
+# Vertically stack 2016 & 2017
+weather_df <- rbind(weather_2016, weather_2017)
+
+# Convert to date object
+weather_2018$event_date <- as.Date(weather_2018[,1])
+
+# Convert to date object
+weather_df$event_date <- as.Date(weather_df[,1])
+
+# Vertically stack 2016/2017 & 2018
+weather_df <- rbind(weather_df, weather_2018)
+
+# Vertically stack 2016/2017/2018 & 2019
+weather_df <- rbind(weather_df, weather_2019)
+```
+
+```{r}
+# Convert unknown precipitation values (e.g. 99.99) manually
+which(weather_df$PRCP==99.99)
+
+# After doing manual historical records search via https://www.worldweatheronline.com/al-manama-weather-history/al-manamah/bh.aspx, the following entries are input
+weather_df[2,6] <- 0
+weather_df[65,6] <- 0.01
+weather_df[71,6] <- 0.02
+weather_df[81,6] <- 0
+weather_df[121,6] <- 0
+weather_df[330,6] <- 0.41
+weather_df[331, 6] <- 0.16
+weather_df[332, 6] <- 0
+weather_df[333, 6] <- 0
+weather_df[385, 6] <- 0.01
+weather_df[387, 6] <- 0
+weather_df[388, 6] <- 0
+weather_df[399, 6] <- 0.02
+weather_df[403, 6] <- 0.06
+weather_df[408, 6] <- 0.01
+weather_df[409, 6] <- 0.04
+weather_df[410, 6] <- 0.05
+weather_df[411, 6] <- 0.07
+weather_df[412, 6] <- 0.18
+weather_df[413, 6] <- 0.77
+weather_df[414, 6] <- 0.56
+weather_df[420, 6] <- 0.03
+weather_df[427, 6] <- 0.02
+weather_df[429, 6] <- 0.01
+weather_df[430, 6] <- 0.07
+weather_df[436, 6] <- 0.01
+weather_df[438, 6] <- 0
+weather_df[439, 6] <- 0.05
+weather_df[440, 6] <- 0
+weather_df[441, 6] <- 0.02
+weather_df[442, 6] <- 0.01
+weather_df[443, 6] <- 0
+weather_df[444, 6] <- 0.14
+weather_df[448, 6] <- 0.01
+weather_df[449, 6] <- 0.24
+weather_df[451, 6] <- 0.22
+weather_df[455, 6] <- 0.01
+weather_df[456, 6] <- 0.01
+weather_df[457, 6] <- 0.07
+weather_df[692, 6] <- 0
+weather_df[785, 6] <- 0.03
+weather_df[836, 6] <- 0
+weather_df[843, 6] <- 0
+weather_df[860, 6] <- 0
+weather_df[1047, 6] <- 0.02
+weather_df[1052, 6] <- 0.01
+weather_df[1053, 6] <- 0
+weather_df[1054, 6] <- 0
+weather_df[1055, 6] <- 0
+weather_df[1056, 6] <- 0
+weather_df[1057, 6] <- 0
+weather_df[1058, 6] <- 0
+weather_df[1095, 6] <- 0
+
+# Check for any missing values
+which(is.na(weather_df))
+
+# Join data sets
+bahrain_data <- right_join(weather_df, bahrain_data, by = 'event_date')
+```
+
+Time data
+
+```{r}
+# Add a new column for the Julian Date (JD) with the formatted full date as a categorical value
+bahrain_data["JD"] <- as.factor(format(bahrain_data$event_date, "%j"))
+
+# Create categorical data for each day of the week
+bahrain_data['Numeric_Weekday'] <- as.factor(ifelse(wday(bahrain_data$event_date)==0,6,wday(bahrain_data$event_date)))
+
+#create a vector of weekdays
+weekdays1 <- c('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday')
+
+#Use `%in%` and `weekdays` to create a logical vector convert to `factor` and specify the `levels/labels`
+# Code sourced from: https://stackoverflow.com/questions/28893193/creating-factor-variables-weekend-and-weekday-from-date
+# 1 represents 'Weekday' and '0' represents 'Weekend'
+bahrain_data['Binary_Weekday'] <- factor((weekdays(bahrain_data$event_date) %in% weekdays1), levels=c(FALSE, TRUE), labels=c(0, 1))
+
+# Create categorical data for each day of the week
+bahrain_data['Month'] <- as.factor(month(bahrain_data$event_date))
+
+# Holiday data from: https://www.officeholidays.com/countries/bahrain/2019
+
+# Read in holidays data
+holidays_data <- read.csv('Holidays.csv', header=TRUE)
+
+# Converts dates into exact equal formats for future merging
+holidays_data$event_date <- as.Date(holidays_data$event_date, format='%m/%d/%Y')
+
+# Convert to categorical
+holidays_data$Holiday <- as.factor(holidays_data$Holiday)
+
+# Determine week numbers
+holidays_data['Week_Number'] <- as.factor(lubridate::week(holidays_data$event_date))
+
+# Join data sets
+bahrain_data <- right_join(holidays_data, bahrain_data, by = 'event_date')
+
+########################## Moon illumination needed
+```
+
+```{r}
+# Join data sets
+bahrain_data <- right_join(social_media_df, bahrain_data, by = 'event_date')
+```
+
+Boolean test to determine any 'NA' values prior to model creation
+
+```{r}
+which(is.na(bahrain_data))
+
+# Creates a copy of bahrain_data for future merge operations
+untouched_df <- bahrain_data
+
+# Export the predictor data
+write.csv(bahrain_data,file="bahrain_data.csv")
+```
+
+Creation of various dataframes (violent demonstrations, attacks, battles, etc.) for modeling
+
+```{r, warning = FALSE}
+# Dataframe for battles
+
+# Filter our response df into various data frames for further EDA and modeling
+Armed_clash_df <- data.frame(response_df[response_df$sub_event_type == 'Armed clash',]$event_date, response_df[response_df$sub_event_type == 'Armed clash',]$count, response_df[response_df$sub_event_type == 'Armed clash',]$fatalities)
+
+# Change column names for future joining operations
+names(Armed_clash_df)[1] <- "event_date"
+names(Armed_clash_df)[2] <- "Armed_clash_count"
+names(Armed_clash_df)[3] <- "Armed_clash_fatalities"
+
+# Merge operation
+Armed_clash_df <- left_join(date_sequence, Armed_clash_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Armed_clash_df[is.na(Armed_clash_df)] <- 0
+
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+battle_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(Armed_clash_df))
+
+# Aggregate all types of protest data
+battle_df$battle_count <- battle_df$Armed_clash_count
+battle_df$battle_fatalities <- battle_df$Armed_clash_fatalities
+
+# Left join operation to create a data frame for manipulation
+untouched_df <- left_join(untouched_df, battle_df, by = "event_date")
+```
+
+```{r, warning = FALSE}
+# Dataframe for Explosions/Remote violence
+
+# Filter our response df into various data frames for further EDA and modeling
+Shelling_artillery_missile_attack_df <- data.frame(response_df[response_df$sub_event_type == 'Shelling/artillery/missile attack',]$event_date, response_df[response_df$sub_event_type == 'Shelling/artillery/missile attack',]$count, response_df[response_df$sub_event_type == 'Shelling/artillery/missile attack',]$fatalities)
+
+# Change column names for future joining operations
+names(Shelling_artillery_missile_attack_df )[1] <- "event_date"
+# Shelling_artillery_missile_attack = SAMA
+names(Shelling_artillery_missile_attack_df )[2] <- "SAMA_count"
+# Shelling_artillery_missile_attack = SAMA
+names(Shelling_artillery_missile_attack_df )[3] <- "SAMA_fatalities"
+
+# Merge operation
+Shelling_artillery_missile_attack_df  <- left_join(date_sequence, Shelling_artillery_missile_attack_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Shelling_artillery_missile_attack_df [is.na(Shelling_artillery_missile_attack_df )] <- 0
+
+# Total number of Remote explosive/landmine/IED
+Remote_explosive_landmine_IED_df <- data.frame(response_df[response_df$sub_event_type == 'Remote explosive/landmine/IED',]$event_date, response_df[response_df$sub_event_type == 'Remote explosive/landmine/IED',]$count, response_df[response_df$sub_event_type == 'Remote explosive/landmine/IED',]$fatalities)
+
+# Change column names for future joining operations
+names(Remote_explosive_landmine_IED_df)[1] <- "event_date"
+# Remote_explosive_landmine_IED_df = RELIED
+names(Remote_explosive_landmine_IED_df)[2] <- "RELIED_count"
+# Remote_explosive_landmine_IED_df = RELIED
+names(Remote_explosive_landmine_IED_df)[3] <- "RELIED_fatalities"
+
+# Merge operation
+Remote_explosive_landmine_IED_df<- left_join(date_sequence, Remote_explosive_landmine_IED_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Remote_explosive_landmine_IED_df[is.na(Remote_explosive_landmine_IED_df)] <- 0
+
+# Total number of Grenades
+Grenade_df <- data.frame(response_df[response_df$sub_event_type == 'Grenade',]$event_date, response_df[response_df$sub_event_type == 'Grenade',]$count, response_df[response_df$sub_event_type == 'Grenade',]$fatalities)
+
+# Change column names for future joining operations
+names(Grenade_df)[1] <- "event_date"
+names(Grenade_df)[2] <- "Grenade_count"
+names(Grenade_df)[3] <- "Grenade_fatalities"
+
+# Merge operation
+Grenade_df <- left_join(date_sequence, Grenade_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Grenade_df[is.na(Grenade_df)] <- 0
+
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+explosions_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(Shelling_artillery_missile_attack_df, Remote_explosive_landmine_IED_df,   Grenade_df))
+
+# Aggregate all types of explosions data
+explosions_df$explosion_count <- explosions_df$SAMA_count + explosions_df$RELIED_count + explosions_df$Grenade_count
+
+# Aggregate all types of explosions data
+explosions_df$explosions_fatalities <- explosions_df$SAMA_fatalities + explosions_df$RELIED_fatalities + explosions_df$Grenade_fatalities
+
+# Left join operation to create a data frame for manipulation
+untouched_df <- left_join(untouched_df, explosions_df, by = "event_date")
+```
+
+```{r, warning = FALSE}
+# Dataframe for Violence against civilians
+
+# Filter our response df into various data frames for further EDA and modeling
+Sexual_violence_df <- data.frame(response_df[response_df$sub_event_type == 'Sexual violence',]$event_date, response_df[response_df$sub_event_type == 'Sexual violence',]$count, response_df[response_df$sub_event_type == 'Sexual violence',]$fatalities)
+
+# Change column names for future joining operations
+names(Sexual_violence_df)[1] <- "event_date"
+names(Sexual_violence_df)[2] <- "Sexual_violence_count"
+names(Sexual_violence_df)[3] <- "sexual_violence_fatalities"
+
+# Merge operation
+Sexual_violence_df <- left_join(date_sequence, Sexual_violence_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Sexual_violence_df[is.na(Sexual_violence_df)] <- 0
+
+# Total number of Attack
+Attack_df <- data.frame(response_df[response_df$sub_event_type == 'Attack',]$event_date, response_df[response_df$sub_event_type == 'Attack',]$count, response_df[response_df$sub_event_type == 'Attack',]$fatalities)
+
+# Change column names for future joining operations
+names(Attack_df)[1] <- "event_date"
+names(Attack_df)[2] <- "Attack_count"
+names(Attack_df)[3] <- "Attack_fatalities"
+
+# Merge operation
+Attack_df<- left_join(date_sequence, Attack_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Attack_df[is.na(Attack_df)] <- 0
+
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+violence_against_civilians_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(Sexual_violence_df, Attack_df))
+
+# Aggregate all types of explosions data
+violence_against_civilians_df$VAC_count <- Attack_df$Attack_count + Sexual_violence_df$Sexual_violence_count
+
+# Aggregate all types of explosions data
+violence_against_civilians_df$VAC_fatalities <- Sexual_violence_df$sexual_violence_fatalities + Attack_df$Attack_fatalities
+
+# Left join operation to create a data frame for manipulation
+untouched_df <- left_join(untouched_df, violence_against_civilians_df, by = "event_date")
+```
+
+```{r, warning = FALSE}
+# Dataframe for protests
+
+# Filter our response df into various data frames for further EDA and modeling
+Excessive_force_against_protesters_df <- data.frame(response_df[response_df$sub_event_type == 'Excessive force against protesters',]$event_date, response_df[response_df$sub_event_type == 'Excessive force against protesters',]$count, response_df[response_df$sub_event_type == 'Excessive force against protesters',]$fatalities)
+
+# Change column names for future joining operations
+names(Excessive_force_against_protesters_df)[1] <- "event_date"
+# Excessive_force_against_protesters = EFAP
+names(Excessive_force_against_protesters_df)[2] <- "EFAP_count"
+# Excessive_force_against_protesters = EFAP
+names(Excessive_force_against_protesters_df)[3] <- "EFAP_fatalities"
+
+# Merge operation
+Excessive_force_against_protesters_df <- left_join(date_sequence, Excessive_force_against_protesters_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Excessive_force_against_protesters_df[is.na(Excessive_force_against_protesters_df)] <- 0
+
+# Total number of protests with interventions
+Protest_with_intervention_df <- data.frame(response_df[response_df$sub_event_type == 'Protest with intervention',]$event_date, response_df[response_df$sub_event_type == 'Protest with intervention',]$count, response_df[response_df$sub_event_type == 'Protest with intervention',]$fatalities)
+
+# Change column names for future joining operations
+names(Protest_with_intervention_df)[1] <- "event_date"
+# Protest_with_intervention = PWI
+names(Protest_with_intervention_df)[2] <- "PWI_count"
+# Protest_with_intervention = PWI
+names(Protest_with_intervention_df)[3] <- "PWI_fatalities"
+
+# Merge operation
+Protest_with_intervention_df <- left_join(date_sequence, Protest_with_intervention_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Protest_with_intervention_df[is.na(Protest_with_intervention_df)] <- 0
+
+# Total number of peaceful protests
+Peaceful_protest_df <- data.frame(response_df[response_df$sub_event_type == 'Peaceful protest',]$event_date, response_df[response_df$sub_event_type == 'Peaceful protest',]$count, response_df[response_df$sub_event_type == 'Peaceful protest',]$fatalities)
+
+# Change column names for future joining operations
+names(Peaceful_protest_df)[1] <- "event_date"
+names(Peaceful_protest_df)[2] <- "Peaceful_protest_count"
+names(Peaceful_protest_df)[3] <- "Peaceful_protest_fatalities"
+
+# Merge operation
+Peaceful_protest_df <- left_join(date_sequence, Peaceful_protest_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+Peaceful_protest_df[is.na(Peaceful_protest_df)] <- 0
+
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+protest_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(Excessive_force_against_protesters_df, Protest_with_intervention_df,   Peaceful_protest_df))
+
+# Aggregate all types of protest data
+protest_df$protest_count <- Excessive_force_against_protesters_df$EFAP_count + Peaceful_protest_df$Peaceful_protest_count + Protest_with_intervention_df$PWI_count
+
+# Aggregate fatalities
+protest_df$protest_fatalities <- Excessive_force_against_protesters_df$EFAP_fatalities + Protest_with_intervention_df$PWI_fatalities + Peaceful_protest_df$Peaceful_protest_fatalities
+
+# Left join operation to create a data frame for manipulation
+untouched_df <- left_join(untouched_df, protest_df, by = "event_date")
+```
+
+```{r, warning = FALSE}
+# Dataframe for riots
+
+# Filter our response df into various data frames for further EDA and modeling
+violent_demonstration_df <- data.frame(response_df[response_df$sub_event_type == 'Violent demonstration',]$event_date, response_df[response_df$sub_event_type == 'Violent demonstration',]$count, response_df[response_df$sub_event_type == 'Violent demonstration',]$fatalities)
+
+# Change column names for future joining operations
+names(violent_demonstration_df)[1] <- "event_date"
+names(violent_demonstration_df)[2] <- "violent_demonstration_count"
+names(violent_demonstration_df)[3] <- "violent_demonstration_fatalities"
+
+# Merge operation
+violent_demonstration_df <- left_join(date_sequence, violent_demonstration_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+violent_demonstration_df[is.na(violent_demonstration_df)] <- 0
+
+# Determine which date is duplicated
+which(duplicated(violent_demonstration_df$event_date))
+
+# Combine the counts for the duplicated day
+violent_demonstration_df[509,2] <- violent_demonstration_df[509,2] + violent_demonstration_df[510,2] 
+violent_demonstration_df[509,3] <- violent_demonstration_df[509,3] + violent_demonstration_df[510,3] 
+
+# Remove duplicated value
+violent_demonstration_df <- violent_demonstration_df[-510,]
+
+# Confirm duplicate is gone
+which(duplicated(violent_demonstration_df$event_date))
+
+# Total number of peaceful protests
+mob_violence_df <- data.frame(response_df[response_df$sub_event_type == 'Mob violence',]$event_date, response_df[response_df$sub_event_type == 'Mob violence',]$count, response_df[response_df$sub_event_type == 'Mob violence',]$fatalities)
+
+# Change column names for future joining operations
+names(mob_violence_df)[1] <- "event_date"
+names(mob_violence_df)[2] <- "mob_violence_count"
+names(mob_violence_df)[3] <- "mob_violence_fatalities"
+
+# Merge operation
+mob_violence_df <- left_join(date_sequence, mob_violence_df, by = 'event_date')
+
+# Since some dates don't have values we fill "NA" values with 0
+mob_violence_df[is.na(mob_violence_df)] <- 0
+
+# Determine which date is duplicated
+which(duplicated(mob_violence_df$event_date))
+
+# Combine the counts for the duplicated day
+mob_violence_df[106,2] <- mob_violence_df[106,2] + mob_violence_df[107,2] 
+mob_violence_df[106,3] <- mob_violence_df[106,3] + mob_violence_df[107,3]
+
+mob_violence_df[108,2] <- mob_violence_df[108,2] + mob_violence_df[109,2] 
+mob_violence_df[108,3] <- mob_violence_df[108,3] + mob_violence_df[109,3]
+
+# Remove duplicated value
+mob_violence_df <- mob_violence_df[-108,]
+mob_violence_df <- mob_violence_df[-106,]
+
+# Confirm duplicate is gone
+which(duplicated(mob_violence_df$event_date))
+
+# Combine each social media dataframe into one
+# Code sourced from: https://stackoverflow.com/questions/14096814/merging-a-lot-of-data-frames
+riot_df <- Reduce(function(x, y) merge(x, y, all=TRUE), list(mob_violence_df, violent_demonstration_df))
+
+# Aggregate all types of protest data
+riot_df$riot_count <- mob_violence_df$mob_violence_count + violent_demonstration_df$violent_demonstration_count
+
+# Aggregate fatalities
+riot_df$riot_fatalities <- mob_violence_df$mob_violence_fatalities + violent_demonstration_df$violent_demonstration_fatalities
+
+# Left join operation to create a data frame for manipulation
+untouched_df <- left_join(untouched_df, riot_df, by = "event_date")
+```
+
+```{r}
+# Aggregate total events
+untouched_df$total_violent_events <- untouched_df$riot_count + untouched_df$VAC_count + untouched_df$protest_count + untouched_df$explosion_count + untouched_df$battle_count
+
+untouched_df$total_fatalities <- untouched_df$riot_fatalities + untouched_df$VAC_fatalities + untouched_df$protest_fatalities + untouched_df$explosions_fatalities + untouched_df$battle_fatalities
+```
+
+```{r}
+# After discussion with Dr Bassett, we'll apply a log +1 to the prediction variable (count).  Log + 1 is used since we have a lot of '0' values.
+# Code sourced from: https://stackoverflow.com/questions/45450590/apply-conditional-function-to-a-dataframe
+#riots_df$count <- log(riots_df$count + 1)
+
+#Check for NAs
+which(is.na(untouched_df))
+```
+
+```{r, message = false, warning = FALSE}
+# Export the riots_df data
+write.csv(untouched_df,file="master_df.csv")
+
+#Change the directory
+setwd("~/")
+setwd("~/Operations Research/Thesis")
+
+# Export the riots_df data
+write.csv(untouched_df,file="master_df.csv")
+```
